@@ -1,9 +1,12 @@
-﻿namespace RickAndMortyPersonInfoWebAPI.Models
+﻿using Newtonsoft.Json;
+
+namespace RickAndMortyPersonInfoWebAPI.Models
 {
     public class Data
     {
         public Info Info { get; set; }
 
-        public RequestInformation[] Results { get; set; }
+        [JsonProperty("results")]
+        public RequestInformation[] DataAboutCharaters { get; set; }
     }
 }

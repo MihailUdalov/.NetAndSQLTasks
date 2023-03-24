@@ -2,7 +2,9 @@
 using Newtonsoft.Json;
 using RickAndMortyPersonInfoWebAPI.Models;
 using System.Net;
+using System.Runtime.Caching;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace RickAndMortyPersonInfoWebAPI.Controllers
 {
@@ -11,6 +13,7 @@ namespace RickAndMortyPersonInfoWebAPI.Controllers
     public class HomeController : ControllerBase
     {
         IConfiguration configuration;
+        private static ObjectCache cache = MemoryCache.Default;
         public HomeController(IConfiguration iConfiguration)
         {
             configuration = iConfiguration;
@@ -22,26 +25,33 @@ namespace RickAndMortyPersonInfoWebAPI.Controllers
             string CharacterAPI = configuration.GetConnectionString("CharacterAPI");
 
             CharactersData characterData = new CharactersData();
-            List<Character> characters = new List<Character>();
+            List<Character> characters = cache.Get(name) as List<Character>;
 
-            characterData = GetAPIData<CharactersData>(string.Format(CharacterAPI, name));
-            characters.AddRange(characterData.Results.Where(x => x.Name == name).Select(x => x).ToList());
-
-            for (int i = 1; i < characterData.Info.Pages; i++)
+            if (characters == null)
             {
-                characterData = GetAPIData<CharactersData>(characterData.Info.Next);
-                characters.AddRange(characterData.Results.Where(x => x.Name == name).Select(x => x).ToList());
-            }
+                characters = new List<Character>();
+                
+                characterData = await GetAPIData<CharactersData>(string.Format(CharacterAPI, name));
+                characters.AddRange(characterData.Characters.Where(x => x.Name == name).Select(x => x).ToList());
 
-            if (characters.Count == 0)
-                return NotFound();
+                for (int i = 1; i < characterData.Info.Pages; i++)
+                {
+                    characterData = await GetAPIData<CharactersData>(characterData.Info.Next);
+                    characters.AddRange(characterData.Characters.Where(x => x.Name == name).Select(x => x).ToList());
+                }
 
-            Regex regex = new Regex(@"\((.*?)\)");
-            foreach (var character in characters)
-            {
+                if (characters.Count == 0)
+                    return NotFound();
 
-                character.Origin.Dimension = regex.Match(character.Origin.Name).Groups[1].Value;
-                character.Origin.Name = regex.Replace(character.Origin.Name, "");
+                Regex regex = new Regex(@"\((.*?)\)");
+                foreach (var character in characters)
+                {
+
+                    character.Origin.Dimension = regex.Match(character.Origin.Name).Groups[1].Value;
+                    character.Origin.Name = regex.Replace(character.Origin.Name, "");
+                }
+
+                cache.Set(name, characters, DateTimeOffset.Now.AddMinutes(10));
             }
 
 
@@ -55,39 +65,54 @@ namespace RickAndMortyPersonInfoWebAPI.Controllers
 
             string CharacterAPI = configuration.GetConnectionString("CharacterAPI");
 
+
             Data characterData = new Data();
-            List<int> charactersID = new List<int>();
-
-            characterData = GetAPIData<Data>(string.Format(CharacterAPI, personName));
-            charactersID.AddRange(characterData.Results.Where(x => x.Name == personName).Select(x => x.ID).ToList());
-
-            for (int i = 1; i < characterData.Info.Pages; i++)
+            List<int> charactersID = cache.Get(string.Format(CharacterAPI, personName)) as List<int>;
+            
+            if (charactersID == null)
             {
-                characterData = GetAPIData<Data>(characterData.Info.Next);
-                charactersID.AddRange(characterData.Results.Where(x => x.Name == personName).Select(x => x.ID).ToList());
-            }
+                charactersID = new List<int>();
 
-            if (charactersID.Count == 0)
-                return NotFound();
+                characterData = await GetAPIData<Data>(string.Format(CharacterAPI, personName));
+                charactersID.AddRange(characterData.DataAboutCharaters.Where(x => x.Name == personName).Select(x => x.ID).ToList());
+
+                for (int i = 1; i < characterData.Info.Pages; i++)
+                {
+                    characterData = await GetAPIData<Data>(characterData.Info.Next);
+                    charactersID.AddRange(characterData.DataAboutCharaters.Where(x => x.Name == personName).Select(x => x.ID).ToList());
+                }
+
+                if (charactersID.Count == 0)
+                    return NotFound();
+
+                cache.Set(string.Format(CharacterAPI, personName), charactersID, DateTimeOffset.Now.AddMinutes(10));
+            }
 
 
             string EpisodeAPI = configuration.GetConnectionString("EpisodeAPI");
 
             Data episodeData = new Data();
             RequestInformation episode = new RequestInformation();
-
-            episodeData = GetAPIData<Data>(string.Format(EpisodeAPI, episodeName));
-            episode = episodeData.Results.Where(x => x.Name == episodeName).FirstOrDefault();
-
-            if (episode is null)
-                return NotFound();
-
-            List<int> charactersIDInEpisode = new List<int>();
-            foreach (var character in episode.Characters)
+            List<int> charactersIDInEpisode = cache.Get(string.Format(EpisodeAPI, episodeName)) as List<int>;
+            
+            if (charactersIDInEpisode == null)
             {
-                charactersIDInEpisode.Add(int.Parse(character.Split('/').Last()));
-            }
+                charactersIDInEpisode = new List<int>();
 
+                episodeData = await GetAPIData<Data>(string.Format(EpisodeAPI, episodeName));
+                episode = episodeData.DataAboutCharaters.Where(x => x.Name == episodeName).FirstOrDefault();
+
+                if (episode == null)
+                    return NotFound();
+
+
+                foreach (var character in episode.Characters)
+                {
+                    charactersIDInEpisode.Add(int.Parse(character.Split('/').Last()));
+                }
+
+                cache.Set(string.Format(EpisodeAPI, episodeName), charactersIDInEpisode, DateTimeOffset.Now.AddMinutes(10));
+            }
 
             if (charactersIDInEpisode.Intersect(charactersID).Any())
                 return Ok(true);
@@ -96,17 +121,17 @@ namespace RickAndMortyPersonInfoWebAPI.Controllers
         }
 
 
-        static T GetAPIData<T>(string APIURL)
+        async static Task<T> GetAPIData<T>(string APIURL)
         {
             HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create(APIURL);
 
-            HttpWebResponse httpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse();
+            HttpWebResponse httpWebResponse = (HttpWebResponse)await httpWebRequest.GetResponseAsync();
 
             string response;
 
             using (StreamReader streamReader = new StreamReader(httpWebResponse.GetResponseStream()))
             {
-                response = streamReader.ReadToEnd();
+                response = await streamReader.ReadToEndAsync();
             }
 
             T data = JsonConvert.DeserializeObject<T>(response);

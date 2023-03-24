@@ -1,0 +1,6 @@
+{
+  "ConnectionStrings": {
+    "CharacterAPI": "https://rickandmortyapi.com/api/character/?name={0}",
+    "EpisodeAPI": "https://rickandmortyapi.com/api/episode/?name={0}"
+  }
+}

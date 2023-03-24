@@ -11,6 +11,7 @@
 using System;
 using System.Reflection;
 
+[assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute("d6c5fc0b-f1f6-463f-8381-701f2f10fd3f")]
 [assembly: System.Reflection.AssemblyCompanyAttribute("RickAndMortyPersonInfoWebAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]

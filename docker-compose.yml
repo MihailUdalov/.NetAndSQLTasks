@@ -1,0 +1,8 @@
+version: '3.4'
+
+services:
+  rickandmortypersoninfowebapi:
+    image: ${DOCKER_REGISTRY-}rickandmortypersoninfowebapi
+    build:
+      context: .
+      dockerfile: RickAndMortyPersonInfoWebAPI\Dockerfile
