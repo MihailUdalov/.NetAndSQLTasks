@@ -1,9 +1,9 @@
 ﻿namespace RickAndMortyPersonInfoWebAPI.Models
 {
-    public class Data
+    public class CharactersData
     {
         public Info Info { get; set; }
 
-        public RequestInformation[] Results { get; set; }
+        public Character[] Results { get; set; }
     }
 }

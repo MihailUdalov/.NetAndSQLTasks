@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "0Y08CyNSZ460yPjJheP0m2aV6o3k4YBSn6Eluiynuso=",
+  "Source": "RickAndMortyPersonInfoWebAPI",
+  "BasePath": "_content/RickAndMortyPersonInfoWebAPI",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

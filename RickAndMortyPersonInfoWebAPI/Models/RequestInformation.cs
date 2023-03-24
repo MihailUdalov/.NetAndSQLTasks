@@ -1,6 +1,6 @@
 ﻿namespace RickAndMortyPersonInfoWebAPI.Models
 {
-    public class Result
+    public class RequestInformation
     {
         public int ID { get; set; }
         public string Name { get; set; }

@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\build\RickAndMortyPersonInfoWebAPI.props" />
+</Project>

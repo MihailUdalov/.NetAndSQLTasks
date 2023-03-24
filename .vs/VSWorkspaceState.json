@@ -1,7 +1,9 @@
 {
   "ExpandedNodes": [
-    ""
+    "",
+    "\\RickAndMortyPersonInfoWebAPI",
+    "\\RickAndMortyPersonInfoWebAPI\\Controllers"
   ],
-  "SelectedNode": "\\E:\\VisualStudioProjects\\.NetAndSQLTasks",
+  "SelectedNode": "\\RickAndMortyPersonInfoWebAPI\\Controllers\\HomeController.cs",
   "PreviewInSolutionExplorer": false
 }
