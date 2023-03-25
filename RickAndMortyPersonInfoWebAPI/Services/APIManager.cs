@@ -4,13 +4,6 @@ using System.Net;
 
 namespace RickAndMortyPersonInfoWebAPI.Services
 {
-    public enum APIs
-    {
-        CharacterAPI,
-        EpisodeAPI
-    }
-
-
     public class APIManager
     {
         private IConfiguration config;
@@ -20,40 +13,43 @@ namespace RickAndMortyPersonInfoWebAPI.Services
             this.config = config;
         }
 
-        public string GetApi(APIs api, string key)
+        public async Task<List<Character>> GetCharactersByName(string name)
         {
-            return string.Format(config.GetConnectionString(APIs.CharacterAPI.ToString()), key);
+            string url = string.Format(config.GetConnectionString(APIs.CharacterAPI.ToString()), name);
+            CharactersData charactersData = await Get<CharactersData>(url);
 
-        }
+            List<Character> characters = new List<Character>();
+            if (charactersData.IsEmpty())
+                return characters;
 
-        public async Task<CharactersData> GetCharacters(string key)
-        {
-            CharactersData charactersData = await Get<CharactersData>(string.Format(config.GetConnectionString(APIs.CharacterAPI.ToString()), key));
-            if (charactersData.Info != null)
+            //add characters from the first page
+            characters.AddRange(charactersData.Characters);
+            for (int i = 1; i < charactersData.Info.Pages; i++)
             {
-                for (int i = 1; i < charactersData.Info.Pages; i++)
-                {
-                    CharactersData pageData = await Get<CharactersData>(charactersData.Info.Next);
-                    charactersData.Characters.ToList().AddRange(pageData.Characters);
-                }
+                charactersData = await Get<CharactersData>(charactersData.Info.Next);
+                characters.AddRange(charactersData.Characters);
             }
 
-            return charactersData;
+            return characters.Where(c => c.Name == name).ToList();
         }
 
-        public async Task<EpisodesData> GetEpisodes(string key)
+        public async Task<Episode> GetEpisode(string name)
         {
-            EpisodesData episodesData = await Get<EpisodesData>(string.Format(config.GetConnectionString(APIs.EpisodeAPI.ToString()), key));
-            if (episodesData.Info != null)
-            {
-                for (int i = 1; i < episodesData.Info.Pages; i++)
-                {
-                    EpisodesData pageData = await Get<EpisodesData>(episodesData.Info.Next);
-                    episodesData.Episodes.ToList().AddRange(pageData.Episodes);
-                }
-            }
+            string url = string.Format(config.GetConnectionString(APIs.EpisodeAPI.ToString()), name);
+            EpisodesData episodesData = await Get<EpisodesData>(url);
 
-            return episodesData;
+            List<Episode> episodes = new List<Episode>();
+            if (episodesData.IsEmpty())
+                return new Episode();
+
+            episodes.AddRange(episodesData.Episodes);
+            for (int i = 1; i < episodesData.Info.Pages; i++)
+                {
+                    episodesData = await Get<EpisodesData>(episodesData.Info.Next);
+                    episodes.AddRange(episodesData.Episodes);
+                }      
+
+            return episodes.Where(e => e.Name == name).FirstOrDefault();
         }
 
         private async Task<T> Get<T>(string url) where T : new()
@@ -72,7 +68,7 @@ namespace RickAndMortyPersonInfoWebAPI.Services
             }
             catch (Exception ex)
             {
-                //TODO: wrtie log...
+                //TODO: wrtie a log...
                 return new T();
             }
         }

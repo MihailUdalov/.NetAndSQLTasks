@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using RickAndMortyPersonInfoWebAPI.Models;
 using System.Runtime.Caching;
-using System.Threading.Tasks;
 
 namespace RickAndMortyPersonInfoWebAPI
 {
@@ -17,9 +14,22 @@ namespace RickAndMortyPersonInfoWebAPI
             cache.Set(key, data, DateTimeOffset.Now.AddMinutes(expirationTime));
         }
 
-        public static object Get<T>(string key) where T: class
+        public static T Get<T>(string key) where T : class
         {
             return cache.Get(key) as T;
+        }
+
+        public static string GetKey(APIs api, string name)
+        {
+            switch (api)
+            {
+                case APIs.CharacterAPI:
+                    return $"{APIs.CharacterAPI}_{name}";
+                case APIs.EpisodeAPI:
+                    return $"{APIs.EpisodeAPI}_{name}";
+                default:
+                    throw new Exception();
+            }
         }
     }
 }

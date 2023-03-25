@@ -2,7 +2,7 @@
 using RickAndMortyPersonInfoWebAPI.Models;
 using RickAndMortyPersonInfoWebAPI.Services;
 using System.Text.RegularExpressions;
-
+using System.Xml.Linq;
 
 namespace RickAndMortyPersonInfoWebAPI.Controllers
 {
@@ -10,7 +10,7 @@ namespace RickAndMortyPersonInfoWebAPI.Controllers
     [Route("api/v1")]
     public class HomeController : ControllerBase
     {
-        private APIManager api;
+        private readonly APIManager api;
 
         public HomeController(IConfiguration config)
         {
@@ -20,28 +20,21 @@ namespace RickAndMortyPersonInfoWebAPI.Controllers
         [HttpGet("person")]
         public async Task<ActionResult<List<Character>>> Get(string name)
         {
-            List<Character> characters = CacheManager.Get<List<Character>>(api.GetApi(APIs.CharacterAPI, name)) as List<Character>;
+            string cacheKey = CacheManager.GetKey(APIs.CharacterAPI, name);
+            List<Character> characters = CacheManager.Get<List<Character>>(cacheKey);
 
             if (characters == null)
             {
-                CharactersData charactersData = await api.GetCharacters(name);
-
-                if (charactersData.Characters == null || charactersData.Characters.Any(c => c.Name != name))
+                characters = await api.GetCharactersByName(name);
+                if (characters == null || characters.Count() == 0)
                     return NotFound();
 
-                characters = charactersData.Characters.Where(c => c.Name == name).ToList();
-
-                CacheManager.Put(api.GetApi(APIs.CharacterAPI, name), characters);
+                CacheManager.Put(cacheKey, characters);
             }
 
             Regex regex = new Regex(@"\((.*?)\)");
-            foreach (var character in characters)
-            {
-                character.Origin.Dimension = regex.Match(character.Origin.Name).Groups[1].Value;
-                character.Origin.Name = regex.Replace(character.Origin.Name, "");
-            }
-
-            var charactersWithOutID = characters.Select(c => new
+            //use anon. to avoid ID property
+            var output = characters.Select(c => new
             {
                 c.Name,
                 c.Status,
@@ -56,50 +49,52 @@ namespace RickAndMortyPersonInfoWebAPI.Controllers
                 }
             });
 
-            return Ok(charactersWithOutID);
+            return Ok(output);
         }
 
         [HttpPost("check-person")]
         public async Task<ActionResult<bool>> Post(string personName, string episodeName)
         {
 
-            List<Character> characters = CacheManager.Get<List<Character>>(api.GetApi(APIs.CharacterAPI, personName)) as List<Character>;
+            string caharactersCacheKey = CacheManager.GetKey(APIs.CharacterAPI, personName);
+            List<Character> characters = CacheManager.Get<List<Character>>(caharactersCacheKey);
 
             if (characters == null)
             {
-                CharactersData charactersData = await api.GetCharacters(personName);
-
-                if (charactersData.Characters == null || charactersData.Characters.Any(c => c.Name != personName))
+                characters = await api.GetCharactersByName(personName);
+                if (characters == null || characters.Count() == 0)
                     return NotFound();
 
-                characters = charactersData.Characters.Where(c => c.Name == personName).ToList();
-
-                CacheManager.Put(api.GetApi(APIs.CharacterAPI, personName), characters);
+                CacheManager.Put(caharactersCacheKey, characters);
             }
 
-            Episode episode = CacheManager.Get<Episode>(api.GetApi(APIs.EpisodeAPI, episodeName)) as Episode;
+            string episodeCacheKey = CacheManager.GetKey(APIs.EpisodeAPI, episodeName);
+            Episode episode = CacheManager.Get<Episode>(episodeCacheKey);
 
             if (episode == null)
             {
-                EpisodesData episodeData = await api.GetEpisodes(episodeName);
+                episode = await api.GetEpisode(episodeName);
 
-                if (episodeData.Episodes == null || episodeData.Episodes.Any(e => e.Name != episodeName))
-                    return NotFound();             
+                if (episode == null || episode.Name == null)
+                    return NotFound();
 
-                episode = episodeData.Episodes.Where(c => c.Name == episodeName).First();
-
-                CacheManager.Put(api.GetApi(APIs.EpisodeAPI, episodeName), episode);
+                CacheManager.Put(episodeCacheKey, episode);
             }
 
 
-            List<int> charactersIDInEpisode = new List<int>();
-            foreach (var character in episode.Characters)
+            List<int> characterIds = new List<int>();
+            foreach (string character in episode.Characters)
             {
-                charactersIDInEpisode.Add(int.Parse(character.Split('/').Last()));
+                if (int.TryParse(character.Split('/').Last(), out int characterId))
+                    characterIds.Add(characterId);
             }
 
-            if (charactersIDInEpisode.Intersect(characters.Select(c => c.ID)).Any())
+            if (characters.Select(c => c.ID)
+                .Intersect(characterIds)
+                .Any())
+            {
                 return Ok(true);
+            }
 
             return Ok(false);
         }

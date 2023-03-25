@@ -7,6 +7,11 @@ namespace RickAndMortyPersonInfoWebAPI.Models
         public Info Info { get; set; }
 
         [JsonProperty("results")]
-        public Character[] Characters { get; set; }
+        public List<Character> Characters { get; set; }
+
+        public bool IsEmpty()
+        {
+            return Info == null || Characters == null;
+        }
     }
 }
