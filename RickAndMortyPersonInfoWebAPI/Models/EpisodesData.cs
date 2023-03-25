@@ -2,11 +2,11 @@
 
 namespace RickAndMortyPersonInfoWebAPI.Models
 {
-    public class Data
+    public class EpisodesData
     {
         public Info Info { get; set; }
 
         [JsonProperty("results")]
-        public RequestInformation[] DataAboutCharaters { get; set; }
+        public Episode[] Episodes { get; set; }
     }
 }

@@ -2,7 +2,9 @@
   "ExpandedNodes": [
     "",
     "\\RickAndMortyPersonInfoWebAPI",
-    "\\RickAndMortyPersonInfoWebAPI\\Controllers"
+    "\\RickAndMortyPersonInfoWebAPI\\Controllers",
+    "\\RickAndMortyPersonInfoWebAPI\\Models"
   ],
+  "SelectedNode": "\\RickAndMortyPersonInfoWebAPI\\Models\\Origin.cs",
   "PreviewInSolutionExplorer": false
 }

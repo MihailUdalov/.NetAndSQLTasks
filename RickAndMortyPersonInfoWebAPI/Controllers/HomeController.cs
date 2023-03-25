@@ -1,10 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
 using RickAndMortyPersonInfoWebAPI.Models;
-using System.Net;
-using System.Runtime.Caching;
+using RickAndMortyPersonInfoWebAPI.Services;
 using System.Text.RegularExpressions;
-using System.Xml.Linq;
+
 
 namespace RickAndMortyPersonInfoWebAPI.Controllers
 {
@@ -12,131 +10,98 @@ namespace RickAndMortyPersonInfoWebAPI.Controllers
     [Route("api/v1")]
     public class HomeController : ControllerBase
     {
-        IConfiguration configuration;
-        private static ObjectCache cache = MemoryCache.Default;
-        public HomeController(IConfiguration iConfiguration)
+        private APIManager api;
+
+        public HomeController(IConfiguration config)
         {
-            configuration = iConfiguration;
+            api = new APIManager(config);
         }
 
         [HttpGet("person")]
         public async Task<ActionResult<List<Character>>> Get(string name)
         {
-            string CharacterAPI = configuration.GetConnectionString("CharacterAPI");
-
-            CharactersData characterData = new CharactersData();
-            List<Character> characters = cache.Get(name) as List<Character>;
+            List<Character> characters = CacheManager.Get<List<Character>>(api.GetApi(APIs.CharacterAPI, name)) as List<Character>;
 
             if (characters == null)
             {
-                characters = new List<Character>();
-                
-                characterData = await GetAPIData<CharactersData>(string.Format(CharacterAPI, name));
-                characters.AddRange(characterData.Characters.Where(x => x.Name == name).Select(x => x).ToList());
+                CharactersData charactersData = await api.GetCharacters(name);
 
-                for (int i = 1; i < characterData.Info.Pages; i++)
-                {
-                    characterData = await GetAPIData<CharactersData>(characterData.Info.Next);
-                    characters.AddRange(characterData.Characters.Where(x => x.Name == name).Select(x => x).ToList());
-                }
-
-                if (characters.Count == 0)
+                if (charactersData.Characters == null || charactersData.Characters.Any(c => c.Name != name))
                     return NotFound();
 
-                Regex regex = new Regex(@"\((.*?)\)");
-                foreach (var character in characters)
-                {
+                characters = charactersData.Characters.Where(c => c.Name == name).ToList();
 
-                    character.Origin.Dimension = regex.Match(character.Origin.Name).Groups[1].Value;
-                    character.Origin.Name = regex.Replace(character.Origin.Name, "");
-                }
-
-                cache.Set(name, characters, DateTimeOffset.Now.AddMinutes(10));
+                CacheManager.Put(api.GetApi(APIs.CharacterAPI, name), characters);
             }
 
+            Regex regex = new Regex(@"\((.*?)\)");
+            foreach (var character in characters)
+            {
+                character.Origin.Dimension = regex.Match(character.Origin.Name).Groups[1].Value;
+                character.Origin.Name = regex.Replace(character.Origin.Name, "");
+            }
 
-            return new ObjectResult(characters);
+            var charactersWithOutID = characters.Select(c => new
+            {
+                c.Name,
+                c.Status,
+                c.Species,
+                c.Type,
+                c.Gender,
+                Origin = new Origin()
+                {
+                    Name = regex.Replace(c.Origin.Name, ""),
+                    Dimension = regex.Match(c.Origin.Name).Groups[1].Value,
+                    Type = c.Origin.Type,
+                }
+            });
+
+            return Ok(charactersWithOutID);
         }
-
 
         [HttpPost("check-person")]
         public async Task<ActionResult<bool>> Post(string personName, string episodeName)
         {
 
-            string CharacterAPI = configuration.GetConnectionString("CharacterAPI");
+            List<Character> characters = CacheManager.Get<List<Character>>(api.GetApi(APIs.CharacterAPI, personName)) as List<Character>;
 
-
-            Data characterData = new Data();
-            List<int> charactersID = cache.Get(string.Format(CharacterAPI, personName)) as List<int>;
-            
-            if (charactersID == null)
+            if (characters == null)
             {
-                charactersID = new List<int>();
+                CharactersData charactersData = await api.GetCharacters(personName);
 
-                characterData = await GetAPIData<Data>(string.Format(CharacterAPI, personName));
-                charactersID.AddRange(characterData.DataAboutCharaters.Where(x => x.Name == personName).Select(x => x.ID).ToList());
-
-                for (int i = 1; i < characterData.Info.Pages; i++)
-                {
-                    characterData = await GetAPIData<Data>(characterData.Info.Next);
-                    charactersID.AddRange(characterData.DataAboutCharaters.Where(x => x.Name == personName).Select(x => x.ID).ToList());
-                }
-
-                if (charactersID.Count == 0)
+                if (charactersData.Characters == null || charactersData.Characters.Any(c => c.Name != personName))
                     return NotFound();
 
-                cache.Set(string.Format(CharacterAPI, personName), charactersID, DateTimeOffset.Now.AddMinutes(10));
+                characters = charactersData.Characters.Where(c => c.Name == personName).ToList();
+
+                CacheManager.Put(api.GetApi(APIs.CharacterAPI, personName), characters);
+            }
+
+            Episode episode = CacheManager.Get<Episode>(api.GetApi(APIs.EpisodeAPI, episodeName)) as Episode;
+
+            if (episode == null)
+            {
+                EpisodesData episodeData = await api.GetEpisodes(episodeName);
+
+                if (episodeData.Episodes == null || episodeData.Episodes.Any(e => e.Name != episodeName))
+                    return NotFound();             
+
+                episode = episodeData.Episodes.Where(c => c.Name == episodeName).First();
+
+                CacheManager.Put(api.GetApi(APIs.EpisodeAPI, episodeName), episode);
             }
 
 
-            string EpisodeAPI = configuration.GetConnectionString("EpisodeAPI");
-
-            Data episodeData = new Data();
-            RequestInformation episode = new RequestInformation();
-            List<int> charactersIDInEpisode = cache.Get(string.Format(EpisodeAPI, episodeName)) as List<int>;
-            
-            if (charactersIDInEpisode == null)
+            List<int> charactersIDInEpisode = new List<int>();
+            foreach (var character in episode.Characters)
             {
-                charactersIDInEpisode = new List<int>();
-
-                episodeData = await GetAPIData<Data>(string.Format(EpisodeAPI, episodeName));
-                episode = episodeData.DataAboutCharaters.Where(x => x.Name == episodeName).FirstOrDefault();
-
-                if (episode == null)
-                    return NotFound();
-
-
-                foreach (var character in episode.Characters)
-                {
-                    charactersIDInEpisode.Add(int.Parse(character.Split('/').Last()));
-                }
-
-                cache.Set(string.Format(EpisodeAPI, episodeName), charactersIDInEpisode, DateTimeOffset.Now.AddMinutes(10));
+                charactersIDInEpisode.Add(int.Parse(character.Split('/').Last()));
             }
 
-            if (charactersIDInEpisode.Intersect(charactersID).Any())
+            if (charactersIDInEpisode.Intersect(characters.Select(c => c.ID)).Any())
                 return Ok(true);
 
             return Ok(false);
-        }
-
-
-        async static Task<T> GetAPIData<T>(string APIURL)
-        {
-            HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create(APIURL);
-
-            HttpWebResponse httpWebResponse = (HttpWebResponse)await httpWebRequest.GetResponseAsync();
-
-            string response;
-
-            using (StreamReader streamReader = new StreamReader(httpWebResponse.GetResponseStream()))
-            {
-                response = await streamReader.ReadToEndAsync();
-            }
-
-            T data = JsonConvert.DeserializeObject<T>(response);
-
-            return data;
         }
     }
 }
