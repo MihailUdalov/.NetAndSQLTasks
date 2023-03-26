@@ -49,7 +49,7 @@ namespace RickAndMortyPersonInfoWebAPI.Services
                     episodes.AddRange(episodesData.Episodes);
                 }      
 
-            return episodes.Where(e => e.Name == name).FirstOrDefault();
+            return episodes.FirstOrDefault(e => e.Name == name);
         }
 
         private async Task<T> Get<T>(string url) where T : new()

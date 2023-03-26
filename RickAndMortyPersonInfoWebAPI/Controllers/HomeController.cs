@@ -20,17 +20,9 @@ namespace RickAndMortyPersonInfoWebAPI.Controllers
         [HttpGet("person")]
         public async Task<ActionResult<List<Character>>> Get(string name)
         {
-            string cacheKey = CacheManager.GetKey(APIs.CharacterAPI, name);
-            List<Character> characters = CacheManager.Get<List<Character>>(cacheKey);
-
-            if (characters == null)
-            {
-                characters = await api.GetCharactersByName(name);
-                if (characters == null || characters.Count() == 0)
-                    return NotFound();
-
-                CacheManager.Put(cacheKey, characters);
-            }
+            List<Character> characters = await GetCharacters(name);
+            if (characters == null || characters.Count() == 0)
+                return NotFound();
 
             Regex regex = new Regex(@"\((.*?)\)");
             //use anon. to avoid ID property
@@ -55,18 +47,9 @@ namespace RickAndMortyPersonInfoWebAPI.Controllers
         [HttpPost("check-person")]
         public async Task<ActionResult<bool>> Post(string personName, string episodeName)
         {
-
-            string caharactersCacheKey = CacheManager.GetKey(APIs.CharacterAPI, personName);
-            List<Character> characters = CacheManager.Get<List<Character>>(caharactersCacheKey);
-
-            if (characters == null)
-            {
-                characters = await api.GetCharactersByName(personName);
-                if (characters == null || characters.Count() == 0)
-                    return NotFound();
-
-                CacheManager.Put(caharactersCacheKey, characters);
-            }
+            List<Character> characters = await GetCharacters(personName);
+            if (characters == null || characters.Count() == 0)
+                return NotFound();
 
             string episodeCacheKey = CacheManager.GetKey(APIs.EpisodeAPI, episodeName);
             Episode episode = CacheManager.Get<Episode>(episodeCacheKey);
@@ -97,6 +80,23 @@ namespace RickAndMortyPersonInfoWebAPI.Controllers
             }
 
             return Ok(false);
+        }
+
+        private async Task<List<Character>> GetCharacters(string name)
+        {
+            string caharactersCacheKey = CacheManager.GetKey(APIs.CharacterAPI, name);
+            List<Character> characters = CacheManager.Get<List<Character>>(caharactersCacheKey);
+
+            if (characters == null)
+            {
+                characters = await api.GetCharactersByName(name);
+                if (characters == null || characters.Count() == 0)
+                    return characters;
+
+                CacheManager.Put(caharactersCacheKey, characters);
+            }
+
+            return characters;
         }
     }
 }
